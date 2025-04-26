@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¿Dónde Naciste? (Meme Edition)</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+            overflow: hidden; /* Esconde el desbordamiento */
+            text-align: center;
+            padding: 0; /* Reset padding body */
+            margin: 0; /* Reset margin body */
+        }
+
+        /* Estilos para ocultar/mostrar secciones */
+        .section {
+            display: none; /* Oculta todas las secciones por defecto */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 100vh; /* Ocupa toda la altura visible */
+            padding: 20px; /* Añadir padding a las secciones */
+            box-sizing: border-box; /* Incluir padding en el tamaño */
+            position: relative; /* Necesario para posicionar el canvas y el botón dentro del menú de inicio */
+            z-index: 1; /* Asegurar que el contenido de la sección está por encima del canvas */
+        }
+
+        .section.active {
+            display: flex; /* Muestra la sección activa */
+        }
+
+        /* --- Canvas para el Fondo del Menú de Inicio --- */
+        #beachCanvas {
+            position: absolute; /* Posicionar detrás del contenido */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Ponerlo en el fondo */
+            display: block; /* Eliminar espacio extra bajo el canvas */
+        }
+
+        /* --- Botón para Toggle Día/Noche --- */
+        #dayNightToggle {
+            position: absolute;
+            top: 20px; /* Ajusta según el padding o diseño */
+            right: 20px; /* Ajusta según el padding o diseño */
+            z-index: 10; /* Asegurar que está encima de otros elementos */
+            padding: 8px 15px;
+            font-size: 0.9em;
+            /* Estilos básicos de botón ya definidos */
+        }
+
+
+        /* --- Estilos del Menú de Inicio (Animación de Física) --- */
+        /* Asegurarse que el contenido del menú de inicio no quede cubierto por el botón */
+        #start-menu h1, #start-menu p, #start-menu #physics-container, #start-menu #controls, #start-menu button {
+             position: relative; /* Asegurar que estos elementos respeten el z-index y estén sobre el canvas */
+             z-index: 2; /* Un z-index mayor que el canvas */
+        }
+
+
+        #physics-container {
+            width: 250px; /* Contenedor para la animación de física */
+            height: 250px;
+            position: relative;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #moving-square {
+            width: 150px; /* Tamaño del cuadrado */
+            height: 150px;
+            background-color: rgba(52, 152, 219, 0.8); /* Color del cuadrado con algo de transparencia */
+            border: 3px solid rgba(41, 128, 185, 0.8);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Centra el cuadrado */
+            transform-origin: 50% 50%; /* Rota alrededor de su centro */
+            overflow: hidden; /* Mantiene la pelota dentro visualmente */
+            box-sizing: border-box; /* Incluye borde en el tamaño */
+        }
+
+        #bouncing-ball {
+            width: 20px; /* Tamaño de la pelota */
+            height: 20px;
+            background-color: #e74c3c; /* Color de la pelota */
+            border-radius: 50%; /* La hace redonda */
+            position: absolute;
+            /* La posición inicial y el movimiento se controlan por JS con transform */
+        }
+
+        #controls {
+            margin-top: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px; /* Espacio entre los controles */
+            flex-wrap: wrap; /* Permite que los controles se envuelvan en pantallas pequeñas */
+            justify-content: center;
+            background-color: rgba(255, 255, 255, 0.5); /* Fondo semi-transparente para legibilidad */
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        #controls div {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+         #controls label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+         }
+
+
+        /* --- Estilos del Menú de Carga (Cubo) --- */
+        #loading-menu {
+             background-color: #f0f0f0; /* Fondo sólido para la pantalla de carga */
+        }
+
+        .scene {
+            width: 200px;
+            height: 200px;
+            perspective: 600px; /* Añade perspectiva 3D */
+            margin-bottom: 30px;
+            transition: transform 3s ease-in-out; /* Transición suave para el zoom */
+        }
+
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d; /* Permite que los hijos existan en espacio 3D */
+            /* La animación de giro y opacidad se aplicarán vía JavaScript */
+        }
+
+         /* Animación de giro del cubo (aplicada vía JS) */
+        @keyframes spin {
+            0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
+            100% { transform: rotateX(720deg) rotateY(720deg) rotateZ(720deg); } /* Gira varias veces */
+        }
+
+        /* Animación de desvanecimiento (aplicada vía JS) */
+        @keyframes fade-out {
+            0% { opacity: 1; } /* Inicia completamente visible */
+            100% { opacity: 0.1; } /* Termina casi invisible */
+        }
+
+
+        /* Estilos para cada cara del cubo */
+        .face {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            /* No tiene fondo propio, los mini-cuadros lo crean */
+        }
+
+        /* Posicionando cada cara del cubo */
+        .face.front { transform: translateZ(100px); }
+        .face.back { transform: rotateY(180deg) translateZ(100px); }
+        .face.right { transform: rotateY(90deg) translateZ(100px); }
+        .face.left { transform: rotateY(-90deg) translateZ(100px); }
+        .face.top { transform: rotateX(90deg) translateZ(100px); }
+        .face.bottom { transform: rotateX(-90deg) translateZ(100px); }
+
+
+        /* Estilos para los mini-cuadros dentro de cada cara */
+        .mini-square {
+            width: calc(100% / 13); /* 13 mini-cuadros por fila */
+            height: calc(100% / 13); /* 13 mini-cuadros por columna */
+            float: left; /* Para alinearlos en una cuadrícula */
+            box-sizing: border-box; /* Incluir borde y padding en el tamaño */
+            /* El background-color se establece vía JavaScript */
+        }
+
+
+        /* Clase para aplicar el zoom */
+        .scene.zoomed {
+            transform: scale(2); /* Zoom in */
+        }
+
+
+        /* --- Estilos de la Pantalla de Resultado --- */
+         #result-screen {
+              background-color: #f0f0f0; /* Fondo sólido para la pantalla de resultado */
+         }
+
+        #result {
+            margin-top: 20px;
+            font-size: 1.8em;
+            font-weight: bold;
+            min-height: 1.8em; /* Reserva espacio */
+        }
+
+        #probability {
+             margin-top: 10px;
+             font-size: 1.2em;
+             color: #555;
+             min-height: 1.2em; /* Reserva espacio */
+        }
+
+        /* --- Estilos del Botón --- */
+        button {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            cursor: pointer;
+            margin-top: 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-menu" class="section active">
+        <canvas id="beachCanvas"></canvas> <button id="dayNightToggle">Toggle Día/Noche</button> <h1>¿Dónde Naciste?</h1>
+        <p>Controla la animación y haz clic en comenzar para descubrir tu origen aleatorio.</p>
+
+        <div id="physics-container">
+            <div id="moving-square">
+                <div id="bouncing-ball"></div>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div>
+                <label for="speed-slider">Velocidad de Giro:</label>
+                <input type="range" id="speed-slider" min="0" max="5" step="0.1" value="1">
+            </div>
+            <div>
+                <label for="direction-slider">Dirección de Giro:</label>
+                <input type="range" id="direction-slider" min="-1" max="1" step="2" value="1"> </div>
+        </div>
+
+        <button id="start-button">Comenzar</button>
+    </div>
+
+    <div id="loading-menu" class="section">
+        <p id="intro-text">El cubo de las mil facetas está girando...</p>
+         <div class="scene">
+            <div class="cube">
+                <div class="face front"></div>
+                <div class="face back"></div>
+                <div class="face right"></div>
+                <div class="face left"></div>
+                <div class="face top"></div>
+                <div class="face bottom"></div>
+                </div>
+        </div>
+    </div>
+
+    <div id="result-screen" class="section">
+        <div id="result"></div>
+        <div id="probability"></div>
+        <button id="restart-button">Jugar de Nuevo</button>
+    </div>
+
+
+    <script>
+        // Lista de los 25 países con su probabilidad aproximada de nacimientos a nivel mundial y un color representativo
+        const countries = [
+            { name: "Estados Unidos", realProbability: 4.2, color: "#002868" }, // Azul
+            { name: "Indonesia", realProbability: 3.4, color: "#EE1629" }, // Rojo
+            { name: "Brasil", realProbability: 2.7, color: "#009739" }, // Verde
+            { name: "México", realProbability: 1.6, color: "#006341" }, // Verde
+            { name: "India", realProbability: 17.7, color: "#FF9933" }, // Naranja Azafrán
+            { name: "Rusia", realProbability: 1.8, color: "#D52B1E" }, // Rojo
+            { name: "Turquía", realProbability: 1.1, color: "#E30A17" }, // Rojo
+            { name: "Arabia Saudita", realProbability: 0.4, color: "#006C35" }, // Verde
+            { name: "Reino Unido", realProbability: 0.8, color: "#C8102E" }, // Rojo
+            { name: "Alemania", realProbability: 1.1, color: "#FFCC00" }, // Dorado
+            { name: "Francia", realProbability: 0.8, color: "#002395" }, // Azul
+            { name: "Italia", realProbability: 0.7, color: "#008C45" }, // Verde
+            { name: "España", realProbability: 0.6, color: "#AA151B" }, // Rojo
+            { name: "Colombia", realProbability: 0.7, color: "#FDE100" }, // Azul
+            { name: "Argentina", realProbability: 0.6, color: "#74ACDF" }, // Azul Cielo
+            { name: "Canadá", realProbability: 0.5, color: "#EE2E37" }, // Rojo
+            { name: "Egipto", realProbability: 1.4, color: "#E30613" }, // Rojo
+            { name: "Vietnam", realProbability: 1.2, color: "#DA251D" }, // Rojo
+            { name: "Perú", realProbability: 0.4, color: "#D91023" }, // Marrón
+            { name: "Chile", realProbability: 0.2, color: "#D51C1E" }, // Rojo
+            { name: "Venezuela", realProbability: 100, color: "#CF142B" }, // Rojo
+            { name: "Cuba", realProbability: 0.1, color: "#002A8F" }, // Azul
+            { name: "Sudáfrica", realProbability: 0.8, color: "#007749" }, // Verde
+            { name: "Kenia", realProbability: 0.7, color: "#B00000" }, // Rojo
+            { name: "Japón", realProbability: 1.6, color: "#BC002D" }  // Rojo
+        ];
+
+        // Referencias a las secciones y elementos principales
+        const startMenu = document.getElementById('start-menu');
+        const loadingMenu = document.getElementById('loading-menu');
+        const resultScreen = document.getElementById('result-screen');
+        const startButton = document.getElementById('start-button');
+        const resultDiv = document.getElementById('result');
+        const probabilityDiv = document.getElementById('probability');
+        const cube = loadingMenu.querySelector('.cube'); // Cubo dentro del menú de carga
+        const scene = loadingMenu.querySelector('.scene'); // Escena dentro del menú de carga
+        const introText = document.getElementById('intro-text');
+        const restartButton = document.getElementById('restart-button'); // Botón de reiniciar
+
+
+        // --- Elementos y variables para la animación de física del Menú de Inicio ---
+        const movingSquare = document.getElementById('moving-square');
+        const bouncingBall = document.getElementById('bouncing-ball');
+        const speedSlider = document.getElementById('speed-slider');
+        const directionSlider = document.getElementById('direction-slider');
+
+        // Estado de la pelota (posición y velocidad relativas al cuadrado)
+        let ball = { x: 0, y: 0, vx: 2, vy: 3, radius: 0 }; // Se inicializarán después de obtener las dimensiones
+
+        // Estado del cuadrado
+        let square = { rotation: 0, rotationSpeed: 0, direction: 1, width: 0, height: 0 }; // Se inicializarán después de obtener las dimensiones
+
+        let physicsAnimationFrameId = null; // Para requestAnimationFrame de física
+        let isPhysicsRunning = false; // Indicador si la animación de física está activa
+
+
+        // --- Elementos y variables para la animación de fondo Canvas (Menú de Inicio) ---
+        const canvas = document.getElementById('beachCanvas');
+        const ctx = canvas.getContext('2d');
+        const dayNightToggle = document.getElementById('dayNightToggle');
+
+        const STATE_DAY = 'day';
+        const STATE_SUNSET = 'sunset';
+        const STATE_NIGHT = 'night';
+        const STATE_SUNRISE = 'sunrise';
+
+        let currentState = STATE_DAY;
+        let timeInState = 0;
+        const stateDurations = {
+            [STATE_DAY]: 8000, // 8 segundos
+            [STATE_SUNSET]: 2000, // 2 segundos para la transición
+            [STATE_NIGHT]: 8000, // 8 segundos
+            [STATE_SUNRISE]: 2000 // 2 segundos para la transición
+        };
+
+        let lastCanvasTimestamp = 0;
+        let canvasAnimationFrameId = null; // Para requestAnimationFrame del canvas
+        let isCanvasRunning = false; // Indicador si la animación del canvas está activa
+
+        // Colores para el gradiente del cielo (ajustar según preferencia)
+        const skyColors = {
+            day: ['#87CEEB', '#00BFFF'], // Azul claro a Azul cielo profundo
+            sunset: ['#FFD700', '#FF8C00', '#FF4500'], // Dorado, Naranja Oscuro, Rojo Naranja
+            night: ['#000033', '#000000'], // Azul oscuro a Negro
+            sunrise: ['#FF4500', '#FF8C00', '#FFD700'] // Rojo Naranja, Naranja Oscuro, Dorado
+        };
+
+        // Función auxiliar para interpolar colores RGB
+        function interpolateColor(color1, color2, factor) {
+            // Asegurarse que factor esté entre 0 y 1
+            factor = Math.max(0, Math.min(1, factor));
+
+            const c1 = hexToRgb(color1);
+            const c2 = hexToRgb(color2);
+            const result = c1.map((c, i) => Math.round(c + factor * (c2[i] - c)));
+            return `rgb(${result[0]}, ${result[1]}, ${result[2]})`;
+        }
+
+        // Función auxiliar para convertir HEX a RGB
+        function hexToRgb(hex) {
+            // Si el color es ya rgb(), no intentar parsear como hex
+            if (hex.startsWith('rgb')) return hex.match(/\d+/g).map(Number);
+
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return [r, g, b];
+        }
+
+
+        // --- Funciones de Dibujo en Canvas ---
+        function drawSky(progress) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            let colors;
+            let p = progress; // Progreso dentro del estado actual (0 a 1)
+
+            switch (currentState) {
+                case STATE_DAY:
+                    colors = skyColors.day;
+                    gradient.addColorStop(0, colors[0]);
+                    gradient.addColorStop(1, colors[1]);
+                    break;
+                case STATE_SUNSET:
+                    // Interpolar entre colores de día y atardecer
+                    gradient.addColorStop(0, interpolateColor(skyColors.day[0], skyColors.sunset[0], p));
+                    gradient.addColorStop(0.5, interpolateColor(skyColors.day[1], skyColors.sunset[1], p));
+                    gradient.addColorStop(1, skyColors.sunset[2]); // Color final del horizonte al atardecer
+                    break;
+                case STATE_NIGHT:
+                     colors = skyColors.night;
+                     gradient.addColorStop(0, colors[0]);
+                     gradient.addColorStop(1, colors[1]);
+                     break;
+                case STATE_SUNRISE:
+                     // Interpolar entre colores de noche y amanecer
+                     gradient.addColorStop(0, interpolateColor(skyColors.night[0], skyColors.sunrise[0], p));
+                     gradient.addColorStop(0.5, interpolateColor(skyColors.night[1], skyColors.sunrise[1], p));
+                     gradient.addColorStop(1, skyColors.sunrise[2]); // Color final del horizonte al amanecer
+                     break;
+            }
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawSunMoon(progress) {
+            const centerX = canvas.width * 0.5;
+            const horizonY = canvas.height * 0.7; // Posición aproximada del horizonte
+
+            ctx.beginPath();
+
+            let x, y, radius, color;
+
+            switch (currentState) {
+                case STATE_DAY:
+                    // Sol alto en el cielo
+                    x = centerX;
+                    y = canvas.height * 0.2;
+                    radius = 30;
+                    color = 'yellow';
+                    break;
+                case STATE_SUNSET:
+                    // Sol bajando hacia el horizonte
+                    const startY_sunset = canvas.height * 0.2;
+                    const endY_sunset = horizonY - 20; // Justo encima del horizonte
+                    y = startY_sunset + progress * (endY_sunset - startY_sunset);
+                    x = centerX; // Camino vertical simple
+                    radius = 30;
+                    // Interpolar color del sol durante el atardecer
+                    color = interpolateColor('yellow', '#FF4500', progress); // Amarillo a Rojo Naranja
+                    break;
+                case STATE_NIGHT:
+                     // Luna alta en el cielo
+                     x = centerX + canvas.width * 0.3; // Desplazar la luna
+                     y = canvas.height * 0.25;
+                     radius = 25;
+                     color = 'white'; // Color de la luna
+                     // (Implementación de luna creciente o estrellas puede añadirse aquí)
+                     break;
+                case STATE_SUNRISE:
+                     // Sol subiendo desde el horizonte
+                     const startY_sunrise = horizonY - 20;
+                     const endY_sunrise = canvas.height * 0.2;
+                     y = startY_sunrise + progress * (endY_sunrise - startY_sunrise);
+                     x = centerX;
+                     radius = 30;
+                     // Interpolar color del sol durante el amanecer
+                     color = interpolateColor('#FF4500', 'yellow', progress); // Rojo Naranja a Amarillo
+                     break;
+            }
+
+            ctx.fillStyle = color;
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+             // Opcional: Dibujar estrellas por la noche
+             if (currentState === STATE_NIGHT) {
+                 ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Color de las estrellas
+                 const numStars = 100;
+                 for(let i = 0; i < numStars; i++) {
+                     const starX = Math.random() * canvas.width;
+                     const starY = Math.random() * (horizonY - 50); // Dibujar estrellas encima del horizonte
+                     const starRadius = Math.random() * 1.5;
+                     ctx.beginPath();
+                     ctx.arc(starX, starY, starRadius, 0, Math.PI * 2);
+                     ctx.fill();
+                 }
+             }
+        }
+
+        function drawGroundWater() {
+            const horizonY = canvas.height * 0.7;
+
+            // Dibujar Agua
+            const waterGradient = ctx.createLinearGradient(0, horizonY, 0, canvas.height);
+            let waterColor1, waterColor2;
+
+            switch (currentState) {
+                case STATE_DAY:
+                case STATE_SUNRISE: // Similar al día para simplificar transición
+                    waterColor1 = '#4682B4'; // Steel Blue
+                    waterColor2 = '#ADD8E6'; // Light Blue
+                    break;
+                case STATE_NIGHT:
+                case STATE_SUNSET: // Similar a la noche para simplificar transición
+                    waterColor1 = '#191970'; // Midnight Blue
+                    waterColor2 = '#4682B4'; // Steel Blue
+                    break;
+            }
+
+             // Simple interpolación de color para el agua durante las transiciones
+             if (currentState === STATE_SUNSET) {
+                 const p = timeInState / stateDurations[currentState];
+                 waterColor1 = interpolateColor('#4682B4', '#191970', p);
+                 waterColor2 = interpolateColor('#ADD8E6', '#4682B4', p);
+             } else if (currentState === STATE_SUNRISE) {
+                  const p = timeInState / stateDurations[currentState];
+                  waterColor1 = interpolateColor('#191970', '#4682B4', p);
+                  waterColor2 = interpolateColor('#4682B4', '#ADD8E6', p);
+             }
+
+            waterGradient.addColorStop(0, waterColor1);
+            waterGradient.addColorStop(1, waterColor2);
+
+            ctx.fillStyle = waterGradient;
+            ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
+
+            // Dibujar Arena (debajo del nivel del agua para simplificar)
+            const sandColorDay = '#F5F5DC'; // Beige claro
+            const sandColorNight = '#A08060'; // Beige más oscuro
+
+            let sandColor = sandColorDay;
+            if (currentState === STATE_NIGHT) {
+                sandColor = sandColorNight;
+            } else if (currentState === STATE_SUNSET) {
+                 const p = timeInState / stateDurations[currentState];
+                 sandColor = interpolateColor(sandColorDay, sandColorNight, p);
+            } else if (currentState === STATE_SUNRISE) {
+                 const p = timeInState / stateDurations[currentState];
+                 sandColor = interpolateColor(sandColorNight, sandColorDay, p);
+            }
+
+            ctx.fillStyle = sandColor;
+            ctx.fillRect(0, horizonY + (canvas.height - horizonY) * 0.8, canvas.width, (canvas.height - horizonY) * 0.2); // Franja simple de arena
+        }
+
+
+        // Función principal de dibujo en Canvas
+        function drawBeach() {
+            const progressInState = timeInState / stateDurations[currentState];
+
+            // Limpiar canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar elementos según el estado actual y el progreso
+            drawSky(progressInState);
+            drawGroundWater();
+            drawSunMoon(progressInState);
+
+            // Solicitar el próximo frame de animación del canvas
+            canvasAnimationFrameId = requestAnimationFrame(updateCanvasAnimation);
+        }
+
+        // Actualiza el estado del tiempo y redibuja el canvas
+        function updateCanvasAnimation(timestamp) {
+            if (!isCanvasRunning) return; // Detiene el loop si la bandera es false
+
+            if (lastCanvasTimestamp === 0) lastCanvasTimestamp = timestamp;
+            const deltaTime = timestamp - lastCanvasTimestamp;
+            lastCanvasTimestamp = timestamp;
+
+            timeInState += deltaTime;
+
+            // Verificar si el estado del tiempo debe cambiar
+            if (timeInState >= stateDurations[currentState]) {
+                timeInState = 0; // Reiniciar el tiempo para el nuevo estado
+                switch (currentState) {
+                    case STATE_DAY:
+                        currentState = STATE_SUNSET;
+                        break;
+                    case STATE_SUNSET:
+                        currentState = STATE_NIGHT;
+                        break;
+                    case STATE_NIGHT:
+                        currentState = STATE_SUNRISE;
+                        break;
+                    case STATE_SUNRISE:
+                        currentState = STATE_DAY;
+                        break;
+                }
+            }
+
+            drawBeach(); // Redibujar para el frame actual
+        }
+
+
+        // Inicia el loop de animación del canvas
+        function startCanvasAnimation() {
+            if (isCanvasRunning) return; // Evita iniciar múltiples loops
+            isCanvasRunning = true;
+            lastCanvasTimestamp = 0; // Reiniciar timestamp para un inicio suave
+            // timeInState = 0; // No resetear tiempo aquí para que el toggle funcione mejor desde cualquier punto
+            drawBeach(); // Comienza el primer frame del loop
+        }
+
+        // Detiene el loop de animación del canvas
+        function stopCanvasAnimation() {
+            if (canvasAnimationFrameId) {
+                cancelAnimationFrame(canvasAnimationFrameId);
+                canvasAnimationFrameId = null;
+            }
+            isCanvasRunning = false;
+            lastCanvasTimestamp = 0; // Reiniciar timestamp
+        }
+
+        // Asegura que el canvas tiene el tamaño correcto al inicio y al redimensionar
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Redibujar después de redimensionar si la animación está corriendo
+            if (isCanvasRunning) {
+               drawBeach();
+            } else if (startMenu.classList.contains('active')) {
+                // Si estamos en el menú de inicio pero la animación estaba detenida, dibujar el estado actual una vez
+                 drawBeach();
+            }
+        }
+
+
+        // Event listener para el botón manual Día/Noche
+        dayNightToggle.addEventListener('click', () => {
+             // Decide a qué estado de transición ir
+            if (currentState === STATE_DAY || currentState === STATE_SUNRISE) {
+                 // Si es de día o amanecer, ir al atardecer
+                 currentState = STATE_SUNSET;
+            } else { // NIGHT or SUNSET
+                 // Si es de noche o atardecer, ir al amanecer
+                 currentState = STATE_SUNRISE;
+            }
+             timeInState = 0; // Empezar la nueva transición desde el principio
+
+             // Asegurarse que la animación esté corriendo para que la transición se vea
+             startCanvasAnimation(); // Esto reiniciará el loop si estaba detenido
+             // La función updateCanvasAnimation continuará desde el nuevo currentState y timeInState=0
+        });
+
+
+        // --- Funciones de Física del Menú de Inicio ---
+
+        // Loop principal para la animación de física del Menú de Inicio
+        function updatePhysics() {
+            if (!isPhysicsRunning) return; // Detiene el loop si la bandera es false
+
+            // 1. Mover la pelota
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 2. Detectar y responder a colisiones con los bordes del cuadrado (en su sistema de coordenadas relativo)
+            // Borde derecho
+            if (ball.x + ball.radius > square.width) {
+                ball.x = square.width - ball.radius;
+                ball.vx *= -1;
+            }
+            // Borde izquierdo
+            if (ball.x - ball.radius < 0) {
+                ball.x = ball.radius;
+                ball.vx *= -1;
+            }
+            // Borde inferior
+            if (ball.y + ball.radius > square.height) {
+                ball.y = square.height - ball.radius;
+                ball.vy *= -1;
+            }
+            // Borde superior
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.vy *= -1;
+            }
+
+            // 3. Aplicar la nueva posición de la pelota usando transform (relativo al cuadrado)
+            bouncingBall.style.transform = `translate(${ball.x - ball.radius}px, ${ball.y - ball.radius}px)`;
+
+            // 4. Actualizar la rotación del cuadrado según los controles del usuario
+            square.rotationSpeed = parseFloat(speedSlider.value);
+            square.direction = parseInt(directionSlider.value);
+            square.rotation += square.rotationSpeed * square.direction;
+
+            // 5. Aplicar la rotación al cuadrado (manteniendo su centrado original)
+             movingSquare.style.transform = `translate(-50%, -50%) rotate(${square.rotation}deg)`;
+
+            // 6. Solicitar el próximo frame para la animación
+            physicsAnimationFrameId = requestAnimationFrame(updatePhysics);
+        }
+
+        // Inicia el loop de animación de física
+        function startPhysics() {
+            if (isPhysicsRunning) return; // Evita iniciar múltiples loops
+            isPhysicsRunning = true;
+            updatePhysics(); // Comienza el primer frame
+        }
+
+        // Detiene el loop de animación de física
+        function stopPhysics() {
+            if (physicsAnimationFrameId) {
+                cancelAnimationFrame(physicsAnimationFrameId);
+                physicsAnimationFrameId = null;
+            }
+            isPhysicsRunning = false;
+        }
+
+
+        // --- Funciones del Cubo y Randomización (Menú de Carga y Resultado) ---
+
+        // Función para generar un color HSL aleatorio para los mini-cuadros del cubo
+        function getRandomCubeColor() {
+            const hue = Math.floor(Math.random() * 360);
+            const saturation = Math.floor(Math.random() * 30) + 70;
+            const lightness = Math.floor(Math.random() * 30) + 50;
+            return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        }
+
+        // Función para llenar cada cara del cubo con mini-cuadros de colores
+        function fillCubeFaces() {
+            const faces = cube.querySelectorAll('.face');
+            const squaresPerSide = 13;
+
+            faces.forEach(face => {
+                face.innerHTML = ''; // Limpiar caras existentes
+                for (let i = 0; i < squaresPerSide * squaresPerSide; i++) {
+                    const miniSquare = document.createElement('div');
+                    miniSquare.classList.add('mini-square');
+                    miniSquare.style.backgroundColor = getRandomCubeColor();
+                    face.appendChild(miniSquare);
+                }
+            });
+        }
+
+
+        // Función para cambiar de sección
+        function showSection(sectionToShow) {
+            const sections = document.querySelectorAll('.section');
+            sections.forEach(section => {
+                section.classList.remove('active');
+            });
+            sectionToShow.classList.add('active');
+        }
+
+
+        // Función principal para iniciar el proceso de carga y resultado
+        function startRandomization() {
+             // Detener las animaciones del menú de inicio (física y canvas)
+            stopPhysics();
+            stopCanvasAnimation();
+
+            // 1. Cambiar al menú de carga
+            showSection(loadingMenu);
+            introText.style.display = 'block'; // Asegura que el texto "girando" se muestra
+
+
+            // 2. Reiniciar la animación del cubo (giro) y opacidad
+            cube.style.animation = 'none'; // Limpiar animaciones previas
+            void cube.offsetWidth; // Forzar reflow
+            cube.style.animation = 'spin 5s linear forwards'; // Aplicar animación de giro
+            cube.style.opacity = 1; // Resetear opacidad a 100%
+
+
+            // Asegurarse de que la escena del cubo no esté ya zoom-in de una ejecución previa
+             scene.classList.remove('zoomed');
+
+
+            // 3. Esperar los 5 segundos de la animación de giro del cubo
+            const cubeAnimationDuration = 5000; // 5 segundos
+            setTimeout(() => {
+                // 4. Ocultar el texto "girando"
+                introText.style.display = 'none';
+
+                // 5. Iniciar el zoom en la escena del cubo
+                scene.classList.add('zoomed');
+
+                // 6. Iniciar la animación de opacidad en el cubo (dura 2s, empieza 1s después del zoom)
+                const fadeDuration = 2000; // 2 segundos
+                const fadeDelay = 1000; // 1 segundo
+                 cube.style.animation = `spin 5s linear forwards, fade-out ${fadeDuration}ms linear ${fadeDelay}ms forwards`;
+
+
+                // 7. Esperar el tiempo total del zoom (3 segundos) para mostrar el resultado
+                const totalZoomTime = 3000; // 3 segundos
+                 setTimeout(() => {
+                    // 8. Cambiar a la pantalla de resultado
+                    showSection(resultScreen);
+
+                    // 9. Realizar la selección aleatoria del país
+                    const randomIndex = Math.floor(Math.random() * countries.length);
+                    const selectedCountryData = countries[randomIndex];
+
+                    // 10. Mostrar el resultado con el nombre del país coloreado
+                    resultDiv.innerHTML = `¡Naciste en: <span style="color: ${selectedCountryData.color};">${selectedCountryData.name}</span>!`;
+
+                    // 11. Mostrar la probabilidad real de nacer en ESE país
+                    probabilityDiv.textContent = `(Tu probabilidad real de nacer en ${selectedCountryData.name} a nivel mundial es aproximadamente ${selectedCountryData.realProbability.toFixed(2)}%)`;
+
+                 }, totalZoomTime);
+
+            }, cubeAnimationDuration);
+        }
+
+
+        // --- Inicialización al cargar el DOM ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Inicialización de la animación de Física ---
+            // Obtener las dimensiones reales del cuadrado y la pelota después de aplicar CSS
+            square.width = movingSquare.offsetWidth;
+            square.height = movingSquare.offsetHeight;
+            ball.radius = bouncingBall.offsetWidth / 2;
+
+             // Ajustar la posición inicial de la pelota para que esté dentro del cuadrado
+            ball.x = square.width / 3;
+            ball.y = square.height / 2;
+             // Aplicar la posición inicial
+             bouncingBall.style.transform = `translate(${ball.x - ball.radius}px, ${ball.y - ball.radius}px)`;
+
+            // Iniciar la animación de física para el menú de inicio
+            startPhysics();
+
+
+            // --- Inicialización de la animación de Fondo Canvas ---
+            // Llenar las caras del cubo con mini-cuadros de colores (se hace una vez al inicio)
+            fillCubeFaces();
+
+             // Asegurarse que el canvas tiene el tamaño correcto al inicio y al redimensionar
+             resizeCanvas();
+             window.addEventListener('resize', resizeCanvas);
+
+            // Iniciar la animación de fondo canvas para el menú de inicio
+            startCanvasAnimation();
+
+
+            // --- Configuración de Event Listeners ---
+            startButton.addEventListener('click', startRandomization);
+
+             restartButton.addEventListener('click', () => {
+                showSection(startMenu);
+                resultDiv.textContent = '';
+                probabilityDiv.textContent = '';
+
+                cube.style.animation = 'none';
+                scene.classList.remove('zoomed');
+                cube.style.opacity = 1;
+                introText.style.display = 'block';
+
+
+                 // Reiniciar las animaciones del menú de inicio (física y canvas)
+                 startPhysics();
+                 startCanvasAnimation(); // Reinicia el fondo animado
+             });
+        });
+
+    </script>
+
+</body>
+</html>
